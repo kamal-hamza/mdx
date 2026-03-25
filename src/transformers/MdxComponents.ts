@@ -5,6 +5,9 @@ import { buildSync } from "esbuild";
 import path from "path";
 import fs from "fs";
 
+// @ts-expect-error This is an inline script loaded by esbuild
+import RUNTIME_CODE from "./runtime.inline.ts";
+
 export interface MdxOptions {
   /** The folder containing the user's MDX Preact components */
   componentsDir: string;
@@ -14,65 +17,7 @@ const defaultOptions: MdxOptions = {
   componentsDir: "./quartz/components/mdx",
 };
 
-// This is the clean runtime that mounts the auto-discovered components
-const RUNTIME_CODE = `
-import { render, h } from "preact";
-
-function parseProps(attrString) {
-  const props = {};
-  const regex = /(\\w+)=["']([^"']*)["']/g;
-  let match;
-  while ((match = regex.exec(attrString)) !== null) props[match[1]] = match[2];
-  return props;
-}
-
-async function mountMdx(registry) {
-  const elements = document.querySelectorAll(".mdx-component-mount");
-  if (!elements.length) return;
-
-  let contextData = { allFiles: [], fileData: { slug: "", frontmatter: {} } };
-  try {
-    const rawData = await window.fetchData;
-    const allFiles = Object.values(rawData).map((c) => ({
-      slug: c.slug, frontmatter: { ...c }, links: c.links,
-    }));
-    const slug = document.body.dataset.slug || "";
-    contextData = { allFiles, fileData: { slug, frontmatter: { ...(rawData[slug] || {}) } } };
-  } catch (e) {
-    console.error("MDX context fetch failed:", e);
-  }
-
-  for (const el of elements) {
-    if (el.dataset.rendered === "true") continue;
-    
-    const mdxCode = el.dataset.mdx || "";
-    const match = mdxCode.match(/<([A-Za-z0-9_]+)([^>]*)\\/?>(.*)/s);
-    if (!match) continue;
-
-    const componentName = match[1];
-    const Component = registry[componentName];
-    
-    if (!Component) {
-      el.innerHTML = '<div class="mdx-error">Component <strong>' + componentName + '</strong> not found.</div>';
-      continue;
-    }
-
-    const inlineProps = parseProps(match[2] || "");
-    
-    // Render the component, merging Quartz context with inline props
-    render(h(Component, { ...contextData, ...inlineProps }), el);
-    el.dataset.rendered = "true";
-  }
-}
-
-// Hook into Quartz SPA router
-if (typeof document !== "undefined") {
-  mountMdx(MDX_REGISTRY);
-  document.addEventListener("nav", () => mountMdx(MDX_REGISTRY));
-}
-`;
-
-export const MdxComponents: QuartzTransformerPlugin<MdxOptions> = (userOpts) => {
+export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (userOpts) => {
   const opts = { ...defaultOptions, ...userOpts };
   let bundledScript: string | null = null;
 
@@ -158,6 +103,7 @@ export const MdxComponents: QuartzTransformerPlugin<MdxOptions> = (userOpts) => 
             bundle: true,
             minify: true,
             write: false,
+            outdir: path.join(process.cwd(), ".quartz-mdx-out"),
             format: "iife",
             jsxFactory: "h",
             jsxFragment: "Fragment",
