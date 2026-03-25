@@ -30,14 +30,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./types": {
-      "types": "./dist/types.d.ts",
-      "import": "./dist/types.js"
-    },
-    "./components": {
-      "types": "./dist/components/index.d.ts",
-      "import": "./dist/components/index.js"
-    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",
@@ -70,7 +62,8 @@
   },
   "dependencies": {
     "@quartz-community/types": "github:quartz-community/types",
-    "@quartz-community/utils": "github:quartz-community/utils"
+    "@quartz-community/utils": "github:quartz-community/utils",
+    "esbuild": "^0.27.4"
   },
   "devDependencies": {
     "@types/hast": "^3.0.4",
@@ -107,23 +100,8 @@
     "defaultOrder": 50,
     "defaultEnabled": true,
     "defaultOptions": {},
-    "optionSchema": {
-      "highlightToken": {
-        "type": "enum",
-        "values": [
-          "==",
-          "**",
-          "~~"
-        ]
-      }
-    },
-    "components": {
-      "ExampleComponent": {
-        "displayName": "Example Component",
-        "defaultPosition": "right",
-        "defaultPriority": 50
-      }
-    }
+    "optionSchema": {},
+    "components": {}
   },
   "engines": {
     "node": ">=22",
