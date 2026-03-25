@@ -45,12 +45,15 @@ describe("MdxComponents", () => {
     transform(ast);
 
     // 4. Verify the transformation
-    const node = ast.children[0] as import("mdast").Html;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const node = ast.children[0] as any;
 
-    // It should have replaced the code block entirely with an html block
-    expect(node.type).toBe("html");
-    expect(node.value).toBe(
-      `<div class="mdx-component-mount" data-mdx="${encodeURIComponent('<MyButton text="Click me" />')}"></div>`,
+    // It should have replaced the code block entirely with a node having hName
+    expect(node.type).toBe("paragraph");
+    expect(node.data.hName).toBe("div");
+    expect(node.data.hProperties.className).toEqual(["mdx-component-mount"]);
+    expect(node.data.hProperties["data-mdx"]).toBe(
+      encodeURIComponent('<MyButton text="Click me" />'),
     );
   });
 

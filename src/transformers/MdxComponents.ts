@@ -1,6 +1,6 @@
 import type { QuartzTransformerPlugin } from "@quartz-community/types";
 import { visit } from "unist-util-visit";
-import type { Code, Html, Root as MdastRoot } from "mdast";
+import type { Code, Root as MdastRoot } from "mdast";
 import { buildSync } from "esbuild";
 import path from "path";
 import fs from "fs";
@@ -29,9 +29,19 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
           return (tree: MdastRoot) => {
             visit(tree, "code", (node: Code, index, parent) => {
               if (node.lang === "mdx") {
-                const mdxIsland: Html = {
-                  type: "html",
-                  value: `<div class="mdx-component-mount" data-mdx="${encodeURIComponent(node.value)}"></div>`,
+                // We use an empty paragraph and let mdast-util-to-hast know it should
+                // be rendered as our custom div, bypassing any raw HTML parsing issues.
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const mdxIsland: any = {
+                  type: "paragraph",
+                  data: {
+                    hName: "div",
+                    hProperties: {
+                      className: ["mdx-component-mount"],
+                      "data-mdx": encodeURIComponent(node.value),
+                    },
+                  },
+                  children: [],
                 };
                 if (parent && index !== undefined) parent.children[index] = mdxIsland;
               }
