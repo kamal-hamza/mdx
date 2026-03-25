@@ -38,7 +38,7 @@ async function mountMdx(registry: Record<string, ComponentType<unknown>>) {
   for (const el of Array.from(elements) as HTMLElement[]) {
     if (el.dataset.rendered === "true") continue;
 
-    const mdxCode = el.dataset.mdx || "";
+    const mdxCode = el.dataset.mdx ? decodeURIComponent(el.dataset.mdx) : "";
     const match = mdxCode.match(/<([A-Za-z0-9_]+)([^>]*)\/?>(.*)/s);
     if (!match || !match[1]) continue;
 

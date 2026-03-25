@@ -1,6 +1,6 @@
 import type { QuartzTransformerPlugin } from "@quartz-community/types";
 import { visit } from "unist-util-visit";
-import type { Element, Root } from "hast";
+import type { Code, Html, Root as MdastRoot } from "mdast";
 import { buildSync } from "esbuild";
 import path from "path";
 import fs from "fs";
@@ -23,35 +23,17 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
 
   return {
     name: "MdxComponents",
-    htmlPlugins() {
+    markdownPlugins() {
       return [
         () => {
-          return (tree: Root) => {
-            visit(tree, "element", (node: Element, index, parent) => {
-              if (node.tagName === "pre" && node.children.length > 0) {
-                const codeNode = node.children[0] as Element;
-                if (
-                  codeNode.tagName === "code" &&
-                  (typeof codeNode.properties?.className === "string"
-                    ? codeNode.properties.className.includes("language-mdx")
-                    : Array.isArray(codeNode.properties?.className) &&
-                      codeNode.properties.className.includes("language-mdx"))
-                ) {
-                  const mdxCode =
-                    codeNode.children[0]?.type === "text" ? codeNode.children[0].value : "";
-
-                  const mdxIsland: Element = {
-                    type: "element",
-                    tagName: "div",
-                    properties: {
-                      className: ["mdx-component-mount"],
-                      "data-mdx": mdxCode,
-                    },
-                    children: [],
-                  };
-
-                  if (parent && index !== undefined) parent.children[index] = mdxIsland;
-                }
+          return (tree: MdastRoot) => {
+            visit(tree, "code", (node: Code, index, parent) => {
+              if (node.lang === "mdx") {
+                const mdxIsland: Html = {
+                  type: "html",
+                  value: `<div class="mdx-component-mount" data-mdx="${encodeURIComponent(node.value)}"></div>`,
+                };
+                if (parent && index !== undefined) parent.children[index] = mdxIsland;
               }
             });
           };

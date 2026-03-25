@@ -8,7 +8,7 @@ vi.mock("../src/transformers/runtime.inline.ts", () => {
 });
 
 import { MdxComponents } from "../src/transformers/MdxComponents";
-import type { Root } from "hast";
+import type { Root } from "mdast";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -17,86 +17,66 @@ describe("MdxComponents", () => {
   it("should transform language-mdx code blocks into mdx islands", () => {
     // 1. Setup the plugin
     const plugin = MdxComponents({ componentsDir: "./quartz/components/mdx" });
-    const htmlPlugins = plugin.htmlPlugins!(
+    const markdownPlugins = plugin.markdownPlugins!(
       {} as unknown as import("@quartz-community/types").BuildCtx,
     );
-    const htmlPluginFactory = htmlPlugins[0] as (options?: unknown) => import("unified").Plugin;
-    const htmlPlugin = htmlPluginFactory();
+    const markdownPluginFactory = markdownPlugins[0] as (
+      options?: unknown,
+    ) => import("unified").Plugin;
+    const markdownPlugin = markdownPluginFactory();
 
     // 2. Create a mock AST representing:
-    // <pre><code class="language-mdx"><MyButton text="Click me" /></code></pre>
+    // ```mdx
+    // <MyButton text="Click me" />
+    // ```
     const ast: Root = {
       type: "root",
       children: [
         {
-          type: "element",
-          tagName: "pre",
-          properties: {},
-          children: [
-            {
-              type: "element",
-              tagName: "code",
-              properties: { className: ["language-mdx"] },
-              children: [
-                {
-                  type: "text",
-                  value: '<MyButton text="Click me" />',
-                },
-              ],
-            },
-          ],
+          type: "code",
+          lang: "mdx",
+          value: '<MyButton text="Click me" />',
         },
       ],
     };
 
     // 3. Apply the transformer
-    const transform = htmlPlugin as (tree: import("hast").Root) => void;
+    const transform = markdownPlugin as (tree: import("mdast").Root) => void;
     transform(ast);
 
     // 4. Verify the transformation
-    const preNode = ast.children[0] as unknown as import("hast").Element;
+    const node = ast.children[0] as import("mdast").Html;
 
-    // It should have replaced the `pre` entirely with a `div` island
-    expect(preNode.tagName).toBe("div");
-    expect(preNode.properties.className).toEqual(["mdx-component-mount"]);
-    expect(preNode.properties["data-mdx"]).toBe('<MyButton text="Click me" />');
-    expect(preNode.children).toEqual([]);
+    // It should have replaced the code block entirely with an html block
+    expect(node.type).toBe("html");
+    expect(node.value).toBe(
+      `<div class="mdx-component-mount" data-mdx="${encodeURIComponent('<MyButton text="Click me" />')}"></div>`,
+    );
   });
 
   it("should ignore standard code blocks", () => {
     const plugin = MdxComponents({ componentsDir: "./quartz/components/mdx" });
-    const htmlPlugins = plugin.htmlPlugins!(
+    const markdownPlugins = plugin.markdownPlugins!(
       {} as unknown as import("@quartz-community/types").BuildCtx,
     );
-    const htmlPluginFactory = htmlPlugins[0] as (options?: unknown) => import("unified").Plugin;
-    const htmlPlugin = htmlPluginFactory();
+    const markdownPluginFactory = markdownPlugins[0] as (
+      options?: unknown,
+    ) => import("unified").Plugin;
+    const markdownPlugin = markdownPluginFactory();
 
     const ast: Root = {
       type: "root",
       children: [
         {
-          type: "element",
-          tagName: "pre",
-          properties: {},
-          children: [
-            {
-              type: "element",
-              tagName: "code",
-              properties: { className: ["language-javascript"] },
-              children: [
-                {
-                  type: "text",
-                  value: 'console.log("Hello");',
-                },
-              ],
-            },
-          ],
+          type: "code",
+          lang: "javascript",
+          value: 'console.log("Hello");',
         },
       ],
     };
 
     const astCopy = JSON.parse(JSON.stringify(ast));
-    const transform = htmlPlugin as (tree: import("hast").Root) => void;
+    const transform = markdownPlugin as (tree: import("mdast").Root) => void;
     transform(ast);
 
     // AST should be completely unchanged
