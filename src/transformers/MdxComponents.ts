@@ -14,7 +14,7 @@ export interface MdxOptions {
 }
 
 const defaultOptions: MdxOptions = {
-  componentsDir: "./quartz/components/mdx",
+  componentsDir: "./components/",
 };
 
 export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (userOpts) => {
