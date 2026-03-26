@@ -88,8 +88,19 @@ async function mountMdx(registry: Record<string, ComponentType<unknown>>) {
 
 // Hook into Quartz SPA router
 if (typeof document !== "undefined") {
+  // Execute immediately
   mountMdx(MDX_REGISTRY);
-  document.addEventListener("nav", () => mountMdx(MDX_REGISTRY));
+
+  // Execute on DOM content loaded (just in case the script executes before DOM is fully ready)
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => mountMdx(MDX_REGISTRY));
+  }
+
+  // Execute on Quartz SPA navigation
+  document.addEventListener("nav", () => {
+    console.log("[MDX] Nav event fired. Remounting components.");
+    mountMdx(MDX_REGISTRY);
+  });
 }
 
 export default "";
