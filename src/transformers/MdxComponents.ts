@@ -99,6 +99,7 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
             format: "iife",
             jsxFactory: "h",
             jsxFragment: "Fragment",
+            external: ["http://*", "https://*"],
             // CRITICAL: Load .scss and .css as raw text so the user's
             // \`import style from "./styles.scss"\` behaves exactly like Quartz components
             loader: {
@@ -124,10 +125,11 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
             js: [
               {
                 script: bundledScript,
+                content: bundledScript, // Adding content as fallback for some Quartz 5 versions
                 loadTime: "afterDOMReady",
                 contentType: "inline",
-                spaPreserve: true,
-              },
+                spaPreserve: false, // Turned off to ensure SPA navigation properly triggers reload
+              } as any,
             ],
           }
         : {};
