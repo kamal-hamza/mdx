@@ -18,11 +18,14 @@ function parseProps(attrString: string) {
 }
 
 async function mountMdx(registry: Record<string, ComponentType<unknown>>) {
+  console.log("[MDX] mountMdx called with registry keys:", Object.keys(registry));
   const elements = document.querySelectorAll(".mdx-component-mount");
+  console.log(`[MDX] Found ${elements.length} mount points.`);
   if (!elements.length) return;
 
   let contextData = { allFiles: [] as unknown[], fileData: { slug: "", frontmatter: {} } };
   try {
+    console.log("[MDX] Fetching context data...");
     const rawData = await window.fetchData;
     const allFiles = Object.values(rawData).map((c: Record<string, unknown>) => ({
       slug: c.slug,
@@ -31,32 +34,55 @@ async function mountMdx(registry: Record<string, ComponentType<unknown>>) {
     }));
     const slug = document.body.dataset.slug || "";
     contextData = { allFiles, fileData: { slug, frontmatter: { ...(rawData[slug] || {}) } } };
+    console.log(`[MDX] Context data loaded. Total files: ${contextData.allFiles.length}`);
   } catch (e) {
-    console.error("MDX context fetch failed:", e);
+    console.error("[MDX] Context fetch failed:", e);
   }
 
   for (const el of Array.from(elements) as HTMLElement[]) {
-    if (el.dataset.rendered === "true") continue;
+    if (el.dataset.rendered === "true") {
+      console.log("[MDX] Element already rendered, skipping");
+      continue;
+    }
 
     const mdxCode = el.dataset.mdx ? decodeURIComponent(el.dataset.mdx) : "";
+    console.log(`[MDX] Processing mdxCode:`, mdxCode);
     const match = mdxCode.match(/<([A-Za-z0-9_]+)([^>]*)\/?>(.*)/s);
-    if (!match || !match[1]) continue;
+    if (!match || !match[1]) {
+      console.warn(`[MDX] Failed to parse component name from:`, mdxCode);
+      continue;
+    }
 
     const componentName = match[1];
+    console.log(`[MDX] Parsed componentName: ${componentName}`);
     const Component = registry[componentName];
 
     if (!Component) {
+      console.error(`[MDX] Component '${componentName}' not found in registry!`);
       el.innerHTML =
         '<div class="mdx-error">Component <strong>' + componentName + "</strong> not found.</div>";
       continue;
     }
 
     const inlineProps = parseProps(match[2] || "");
+    const combinedProps = { ...contextData, ...inlineProps };
+    console.log(`[MDX] Rendering ${componentName} with props:`, combinedProps);
+    console.log(`[MDX] Target Element before render:`, el.outerHTML);
 
-    // Render the component, merging Quartz context with inline props
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    render(h(Component, { ...contextData, ...inlineProps } as any), el);
-    el.dataset.rendered = "true";
+    try {
+      // Render the component, merging Quartz context with inline props
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const vnode = h(Component, combinedProps as any);
+      console.log(`[MDX] Created Preact VNode for ${componentName}:`, vnode);
+      render(vnode, el);
+      el.dataset.rendered = "true";
+      console.log(
+        `[MDX] Successfully rendered ${componentName}. Target Element after render:`,
+        el.outerHTML,
+      );
+    } catch (err) {
+      console.error(`[MDX] Error rendering ${componentName}:`, err);
+    }
   }
 }
 
