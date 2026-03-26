@@ -67,7 +67,7 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
         if (!fs.existsSync(absComponentsDir)) {
           console.warn(`[MdxPlugin] Components directory not found: ${absComponentsDir}`);
           jsResources.push({
-            script: `console.error("MDX Plugin failed to load: Components directory not found at ${absComponentsDir}");`,
+            script: `console.error(${JSON.stringify("MDX Plugin failed to load: Components directory not found at " + absComponentsDir)});`,
             loadTime: "afterDOMReady",
             contentType: "inline",
             spaPreserve: true,
@@ -82,22 +82,23 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
 
         // 2. Generate the dynamic imports mapping
         const importStatements = files
-          .map((f) => {
-            const name = path.basename(f).replace(/\.(tsx|jsx)$/, "");
-            return `import ${name} from "${path.join(absComponentsDir, f).replace(/\\/g, "/")}";`;
+          .map((f, i) => {
+            return `import Component_${i} from "${path.join(absComponentsDir, f).replace(/\\/g, "/")}";`;
           })
           .join("\n");
 
         const registryObject = files
-          .map((f) => path.basename(f).replace(/\.(tsx|jsx)$/, ""))
-          .join(", ");
+          .map((f, i) => `"${path.basename(f).replace(/\.(tsx|jsx)$/, "")}": Component_${i}`)
+          .join(",\n  ");
 
         // 3. Create the temporary entrypoint file for ESBuild
         const tempEntryPath = path.join(process.cwd(), ".quartz-mdx-entry.tsx");
         const entryContent = `
-          ${importStatements}
-          const MDX_REGISTRY = { ${registryObject} };
-          ${RUNTIME_CODE}
+${importStatements}
+const MDX_REGISTRY = {
+  ${registryObject}
+};
+${RUNTIME_CODE}
         `;
 
         fs.writeFileSync(tempEntryPath, entryContent);
@@ -131,7 +132,7 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
         } catch (e) {
           console.error("[MdxPlugin] Bundle failed:", e);
           jsResources.push({
-            script: `console.error("MDX Plugin Bundle failed: ${String(e).replace(/`/g, "'").replace(/\n/g, " ")}");`,
+            script: `console.error(${JSON.stringify("MDX Plugin Bundle failed: " + String(e))});`,
             loadTime: "afterDOMReady",
             contentType: "inline",
             spaPreserve: true,
