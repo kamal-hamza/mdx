@@ -51,12 +51,28 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
       ];
     },
     externalResources() {
+      const jsResources: any[] = [];
+
+      // Always inject a simple sanity check script so we know the hook is working
+      jsResources.push({
+        script: `console.log("MDX Plugin externalResources hook is running!");`,
+        loadTime: "afterDOMReady",
+        contentType: "inline",
+        spaPreserve: true,
+      });
+
       if (!bundledScript) {
         const absComponentsDir = path.resolve(process.cwd(), opts.componentsDir);
 
         if (!fs.existsSync(absComponentsDir)) {
           console.warn(`[MdxPlugin] Components directory not found: ${absComponentsDir}`);
-          return {};
+          jsResources.push({
+            script: `console.error("MDX Plugin failed to load: Components directory not found at ${absComponentsDir}");`,
+            loadTime: "afterDOMReady",
+            contentType: "inline",
+            spaPreserve: true,
+          });
+          return { js: jsResources };
         }
 
         // 1. Auto-discover all .tsx and .jsx files in the user's directory
@@ -114,25 +130,30 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
           if (outJs) bundledScript = outJs.text;
         } catch (e) {
           console.error("[MdxPlugin] Bundle failed:", e);
+          jsResources.push({
+            script: `console.error("MDX Plugin Bundle failed: ${String(e).replace(/`/g, "'").replace(/\n/g, " ")}");`,
+            loadTime: "afterDOMReady",
+            contentType: "inline",
+            spaPreserve: true,
+          });
         } finally {
           // Cleanup
           if (fs.existsSync(tempEntryPath)) fs.unlinkSync(tempEntryPath);
         }
       }
 
-      return bundledScript
-        ? {
-            js: [
-              {
-                script: bundledScript,
-                content: bundledScript, // Adding content as fallback for some Quartz 5 versions
-                loadTime: "afterDOMReady",
-                contentType: "inline",
-                spaPreserve: false, // Turned off to ensure SPA navigation properly triggers reload
-              } as any,
-            ],
-          }
-        : {};
+      if (bundledScript) {
+        jsResources.push({
+          script:
+            `console.log("Quartz is successfully injecting the MDX script! bundledScript length: ${bundledScript.length}");\n` +
+            bundledScript,
+          loadTime: "afterDOMReady",
+          contentType: "inline",
+          spaPreserve: true,
+        });
+      }
+
+      return { js: jsResources };
     },
   };
 };
