@@ -6,7 +6,7 @@ import path from "path";
 import fs from "fs";
 
 // @ts-expect-error This is an inline script loaded by esbuild
-import RUNTIME_CODE from "./runtime.inline.ts";
+import RUNTIME_CODE from "./scripts/runtime.inline.ts";
 
 export interface MdxOptions {
   /** The folder containing the user's MDX Preact components */
