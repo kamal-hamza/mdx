@@ -107,13 +107,27 @@ async function mountMdx(registry) {
   if (!elements.length) return;
 
   let contextData = { allFiles: [], fileData: { slug: "", frontmatter: {} } };
+  
   try {
-    const rawData = window.fetchData ? await window.fetchData : null;
-    if (rawData) {
-      // FIX: Use Object.keys to extract the slug from the dictionary key
+    // 1. Get the base URL from Quartz's HTML root element
+    const base = document.documentElement.dataset.base || "";
+    const fetchUrl = base + "/static/contentIndex.json";
+    
+    // 2. Fetch the content index directly
+    const res = await fetch(fetchUrl);
+    if (res.ok) {
+      const indexData = await res.json();
+      // The content index might be nested differently based on Quartz version, 
+      // but usually it's a map. Sometimes it's { [slug]: { title, tags, ... } }
+      // Wait, Quartz content index is usually a map of slugs to data.
+      // Wait, let's look at the fix provided by the user.
+      
+      const rawData = indexData; // We just need to parse the dictionary keys
+      
+      // 3. Map the dictionary keys into the 'slug' property
       const allFiles = Object.keys(rawData).map((key) => ({
         slug: key,
-        frontmatter: rawData[key],
+        frontmatter: rawData[key], // Contains title, tags, dates, etc.
       }));
       
       const slug = document.body.dataset.slug || "";
@@ -121,11 +135,15 @@ async function mountMdx(registry) {
         allFiles, 
         fileData: { slug, frontmatter: rawData[slug] || {} } 
       };
+      console.log(\`[MDX] Successfully loaded \${allFiles.length} files into context.\`);
+    } else {
+      console.error("[MDX] Failed to fetch content index. Status:", res.status);
     }
   } catch (e) {
     console.error("[MDX] Context fetch failed:", e);
   }
 
+  // 4. Render components
   for (const el of Array.from(elements)) {
     if (el.dataset.rendered === "true") continue;
 
