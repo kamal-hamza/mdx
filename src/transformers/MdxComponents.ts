@@ -5,9 +5,6 @@ import { buildSync } from "esbuild";
 import path from "path";
 import fs from "fs";
 
-// @ts-expect-error This is an inline script loaded by esbuild
-import RUNTIME_CODE from "./scripts/runtime.inline.ts";
-
 export interface MdxOptions {
   /** The folder containing the user's MDX Preact components */
   componentsDir: string;
@@ -29,8 +26,6 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
           return (tree: MdastRoot) => {
             visit(tree, "code", (node: Code, index, parent) => {
               if (node.lang === "mdx") {
-                // We use an empty paragraph and let mdast-util-to-hast know it should
-                // be rendered as our custom div, bypassing any raw HTML parsing issues.
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const mdxIsland: any = {
                   type: "paragraph",
@@ -91,20 +86,93 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
           .map((f, i) => `"${path.basename(f).replace(/\.(tsx|jsx)$/, "")}": Component_${i}`)
           .join(",\n  ");
 
-        // 3. Create the temporary entrypoint file for ESBuild
+        // 3. INLINE RUNTIME SCRIPT (Replaces runtime.inline.ts)
+        const runtimeScript = `
+import { render, h } from "preact";
+
+function parseProps(attrString) {
+  const props = {};
+  const regex = /(\\w+)=["']([^"']*)["']/g;
+  let match;
+  while ((match = regex.exec(attrString)) !== null) {
+    if (match[1] && match[2] !== undefined) {
+      props[match[1]] = match[2];
+    }
+  }
+  return props;
+}
+
+async function mountMdx(registry) {
+  const elements = document.querySelectorAll(".mdx-component-mount");
+  if (!elements.length) return;
+
+  let contextData = { allFiles: [], fileData: { slug: "", frontmatter: {} } };
+  try {
+    const rawData = window.fetchData ? await window.fetchData : null;
+    if (rawData) {
+      const allFiles = Object.values(rawData).map((c) => ({
+        slug: c.slug,
+        frontmatter: { ...c },
+        links: c.links,
+      }));
+      const slug = document.body.dataset.slug || "";
+      contextData = { allFiles, fileData: { slug, frontmatter: { ...(rawData[slug] || {}) } } };
+    }
+  } catch (e) {
+    console.error("[MDX] Context fetch failed:", e);
+  }
+
+  for (const el of Array.from(elements)) {
+    if (el.dataset.rendered === "true") continue;
+
+    const mdxCode = el.dataset.mdx ? decodeURIComponent(el.dataset.mdx) : "";
+    const match = mdxCode.match(/<([A-Za-z0-9_]+)([^>]*)\\/?>(.*)/s);
+    if (!match || !match[1]) continue;
+
+    const componentName = match[1];
+    const Component = registry[componentName];
+
+    if (!Component) {
+      el.innerHTML = '<div class="mdx-error">Component <strong>' + componentName + '</strong> not found.</div>';
+      continue;
+    }
+
+    const inlineProps = parseProps(match[2] || "");
+    const combinedProps = { ...contextData, ...inlineProps };
+
+    try {
+      const vnode = h(Component, combinedProps);
+      render(vnode, el);
+      el.dataset.rendered = "true";
+    } catch (err) {
+      console.error(\`[MDX] Error rendering \${componentName}:\`, err);
+    }
+  }
+}
+
+if (typeof document !== "undefined") {
+  mountMdx(MDX_REGISTRY);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => mountMdx(MDX_REGISTRY));
+  }
+  document.addEventListener("nav", () => mountMdx(MDX_REGISTRY));
+}
+        `;
+
+        // 4. Create the temporary entrypoint file for ESBuild
         const tempEntryPath = path.join(process.cwd(), ".quartz-mdx-entry.tsx");
         const entryContent = `
 ${importStatements}
 const MDX_REGISTRY = {
   ${registryObject}
 };
-${RUNTIME_CODE}
+${runtimeScript}
         `;
 
         fs.writeFileSync(tempEntryPath, entryContent);
 
         try {
-          // 4. Bundle using ESBuild.
+          // 5. Bundle using ESBuild.
           // absWorkingDir ensures it uses the user's node_modules (Preact)
           const result = buildSync({
             entryPoints: [tempEntryPath],
