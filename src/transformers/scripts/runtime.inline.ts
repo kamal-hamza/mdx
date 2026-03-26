@@ -26,15 +26,22 @@ async function mountMdx(registry: Record<string, ComponentType<unknown>>) {
   let contextData = { allFiles: [] as unknown[], fileData: { slug: "", frontmatter: {} } };
   try {
     console.log("[MDX] Fetching context data...");
-    const rawData = await window.fetchData;
-    const allFiles = Object.values(rawData).map((c: Record<string, unknown>) => ({
-      slug: c.slug,
-      frontmatter: { ...c },
-      links: c.links,
-    }));
-    const slug = document.body.dataset.slug || "";
-    contextData = { allFiles, fileData: { slug, frontmatter: { ...(rawData[slug] || {}) } } };
-    console.log(`[MDX] Context data loaded. Total files: ${contextData.allFiles.length}`);
+    const rawData = window.fetchData ? await window.fetchData : null;
+
+    if (rawData) {
+      const allFiles = Object.values(rawData).map((c: Record<string, unknown>) => ({
+        slug: c.slug,
+        frontmatter: { ...c },
+        links: c.links,
+      }));
+      const slug = document.body.dataset.slug || "";
+      contextData = { allFiles, fileData: { slug, frontmatter: { ...(rawData[slug] || {}) } } };
+      console.log(`[MDX] Context data loaded. Total files: ${contextData.allFiles.length}`);
+    } else {
+      console.log(
+        "[MDX] window.fetchData resolved to null or undefined. Proceeding with empty context.",
+      );
+    }
   } catch (e) {
     console.error("[MDX] Context fetch failed:", e);
   }
