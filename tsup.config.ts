@@ -57,7 +57,7 @@ const inlineScriptPlugin: Plugin = {
         target: "es2020",
         sourcemap: false,
         // Preserve dynamic CDN imports (e.g. graph plugin loading d3/pixi from CDN)
-        external: ["http://*", "https://*"],
+        external: ["http://*", "https://*", "preact", "preact/*"],
       });
 
       const js = result.outputFiles?.[0]?.text;

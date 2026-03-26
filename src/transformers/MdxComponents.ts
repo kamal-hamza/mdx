@@ -114,8 +114,8 @@ ${RUNTIME_CODE}
             write: false,
             outdir: path.join(process.cwd(), ".quartz-mdx-out"),
             format: "iife",
-            jsxFactory: "h",
-            jsxFragment: "Fragment",
+            jsx: "automatic",
+            jsxImportSource: "preact",
             external: ["http://*", "https://*"],
             // CRITICAL: Load .scss and .css as raw text so the user's
             // \`import style from "./styles.scss"\` behaves exactly like Quartz components
