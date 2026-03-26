@@ -110,13 +110,17 @@ async function mountMdx(registry) {
   try {
     const rawData = window.fetchData ? await window.fetchData : null;
     if (rawData) {
-      const allFiles = Object.values(rawData).map((c) => ({
-        slug: c.slug,
-        frontmatter: { ...c },
-        links: c.links,
+      // FIX: Use Object.keys to extract the slug from the dictionary key
+      const allFiles = Object.keys(rawData).map((key) => ({
+        slug: key,
+        frontmatter: rawData[key],
       }));
+      
       const slug = document.body.dataset.slug || "";
-      contextData = { allFiles, fileData: { slug, frontmatter: { ...(rawData[slug] || {}) } } };
+      contextData = { 
+        allFiles, 
+        fileData: { slug, frontmatter: rawData[slug] || {} } 
+      };
     }
   } catch (e) {
     console.error("[MDX] Context fetch failed:", e);
