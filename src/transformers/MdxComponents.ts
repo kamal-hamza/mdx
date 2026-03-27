@@ -88,7 +88,13 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
             const fileContent = fs.readFileSync(file, "utf-8");
             const { data: frontmatter } = matter(fileContent);
 
+            // 1. Get the base path
             let slug = path.relative(contentDir, file).replace(/\\/g, "/").replace(/\.md$/, "");
+
+            // 2. APPLY QUARTZ SLUGIFICATION (Replace spaces with hyphens)
+            slug = slug.replace(/\s+/g, "-");
+
+            // 3. Handle index files
             if (slug.endsWith("/index")) slug = slug.slice(0, -6);
             if (slug === "index") slug = "index";
 
