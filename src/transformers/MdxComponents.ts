@@ -4,6 +4,7 @@ import type { Code, Root as MdastRoot } from "mdast";
 import { buildSync } from "esbuild";
 import path from "path";
 import fs from "fs";
+import matter from "gray-matter";
 
 export interface MdxOptions {
   /** The folder containing the user's MDX Preact components */
@@ -13,6 +14,24 @@ export interface MdxOptions {
 const defaultOptions: MdxOptions = {
   componentsDir: "./components/",
 };
+
+// Module-level flag so we only scan the file system once per build
+let frontmatterGenerated = false;
+
+// Recursive File Scanner
+function getAllMarkdownFiles(dir: string, fileList: string[] = []) {
+  if (!fs.existsSync(dir)) return fileList;
+  const files = fs.readdirSync(dir);
+  for (const file of files) {
+    const fullPath = path.join(dir, file);
+    if (fs.statSync(fullPath).isDirectory()) {
+      getAllMarkdownFiles(fullPath, fileList);
+    } else if (file.endsWith(".md")) {
+      fileList.push(fullPath);
+    }
+  }
+  return fileList;
+}
 
 export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (userOpts) => {
   const opts = { ...defaultOptions, ...userOpts };
@@ -45,17 +64,50 @@ export const MdxComponents: QuartzTransformerPlugin<Partial<MdxOptions>> = (user
         },
       ];
     },
-    externalResources() {
+    externalResources(ctx) {
       const jsResources: any[] = [];
 
-      // Always inject a simple sanity check script so we know the hook is working
-      jsResources.push({
-        script: `console.log("MDX Plugin externalResources hook is running!");`,
-        loadTime: "afterDOMReady",
-        contentType: "inline",
-        spaPreserve: true,
-      });
+      // ==========================================
+      // INLINE FRONTMATTER GENERATION
+      // ==========================================
+      if (!frontmatterGenerated && ctx?.argv) {
+        try {
+          const contentDir = path.resolve(process.cwd(), ctx.argv.directory);
+          const staticDir = path.join(process.cwd(), ctx.argv.output, "static");
 
+          if (!fs.existsSync(staticDir)) {
+            fs.mkdirSync(staticDir, { recursive: true });
+          }
+
+          const frontmatterPath = path.join(staticDir, "mdx-frontmatter.json");
+          const data: Record<string, any> = {};
+
+          const mdFiles = getAllMarkdownFiles(contentDir);
+          for (const file of mdFiles) {
+            // Let gray-matter do the heavy lifting safely
+            const fileContent = fs.readFileSync(file, "utf-8");
+            const { data: frontmatter } = matter(fileContent);
+
+            let slug = path.relative(contentDir, file).replace(/\\/g, "/").replace(/\.md$/, "");
+            if (slug.endsWith("/index")) slug = slug.slice(0, -6);
+            if (slug === "index") slug = "index";
+
+            data[slug] = frontmatter;
+          }
+
+          fs.writeFileSync(frontmatterPath, JSON.stringify(data));
+          console.log(
+            `\n✅ [MDX Plugin] Successfully generated mdx-frontmatter.json with ${Object.keys(data).length} entries.\n`,
+          );
+          frontmatterGenerated = true;
+        } catch (e) {
+          console.error("[MDX Plugin] Failed to generate frontmatter JSON:", e);
+        }
+      }
+
+      // ==========================================
+      // COMPONENT BUNDLING
+      // ==========================================
       if (!bundledScript) {
         const absComponentsDir = path.resolve(process.cwd(), opts.componentsDir);
 

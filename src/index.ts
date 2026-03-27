@@ -1,5 +1,4 @@
 export { MdxComponents } from "./transformers/MdxComponents";
-export { MdxFrontmatterEmitter } from "./transformers/MdxFrontmatterEmitter";
 export type { MdxOptions } from "./transformers/MdxComponents";
 
 // Re-export shared types from @quartz-community/types
